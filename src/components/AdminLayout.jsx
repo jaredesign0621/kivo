@@ -119,7 +119,8 @@ export default function AdminLayout() {
             </div>
           )}
           {activeMenu === 'users' && <UsersManagementContent />}
-          {activeMenu !== 'dashboard' && activeMenu !== 'users' && (
+          {activeMenu === 'projects' && <ProjectsManagementContent />}
+          {activeMenu !== 'dashboard' && activeMenu !== 'users' && activeMenu !== 'projects' && (
             <div className="p-6 h-full">
               <PlaceholderContent label={activeMenu} />
             </div>
@@ -270,10 +271,130 @@ function LogItem({ type, message, time }) {
 
 function PlaceholderContent({ label }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-neutral-meta py-20">
-      <FiFileText size={48} className="mb-4 text-gray-300" />
-      <h2 className="text-lg font-medium text-neutral-main mb-2">{label === 'users' ? '사용자 관리' : label === 'projects' ? '프로젝트 관리' : label === 'content' ? '콘텐츠 관리' : '시스템 설정'} 화면</h2>
-      <p className="text-ui">현재 이 화면은 준비 중입니다. 기능 구현이 필요하면 말씀해 주세요!</p>
+    <div className="h-full flex flex-col items-center justify-center text-neutral-meta">
+      <FiBox size={48} className="mb-4 opacity-50" />
+      <h2 className="text-xl font-semibold mb-2">개발 준비 중입니다</h2>
+      <p>{label} 기능은 다음 업데이트에 포함될 예정입니다.</p>
+    </div>
+  );
+}
+
+function ProjectsManagementContent() {
+  const [projects, setProjects] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+
+    const fetchProjects = () => {
+      try {
+        const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const projectData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate()?.toLocaleDateString() || '방금 전'
+            };
+          });
+          setProjects(projectData);
+          setIsLoading(false);
+        }, (error) => {
+          console.error("Firestore onSnapshot Error:", error);
+          if (import.meta.env.DEV) {
+            setProjects([
+              { id: '1', name: 'KIVO 디자인 리뉴얼', description: '메인 웹사이트 디자인 개편', createdAt: '2026. 07. 05', createdBy: '관리자', status: '활성' },
+              { id: '2', name: '백엔드 마이그레이션', description: 'DB 구조 변경 및 이전', createdAt: '2026. 07. 01', createdBy: '개발팀', status: '완료' }
+            ]);
+          }
+          setIsLoading(false);
+        });
+      } catch (err) {
+        console.error("Error setting up project listener:", err);
+        if (import.meta.env.DEV) {
+          setProjects([
+            { id: '1', name: 'KIVO 디자인 리뉴얼', description: '메인 웹사이트 디자인 개편', createdAt: '2026. 07. 05', createdBy: '관리자', status: '활성' }
+          ]);
+        }
+        setIsLoading(false);
+      }
+    };
+
+    fetchProjects();
+
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <div className="p-6 h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-xl font-bold text-neutral-main">프로젝트 목록</h2>
+          <p className="text-ui text-neutral-meta mt-1">현재 진행 중인 프로젝트를 관리합니다.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-sm text-ui hover:bg-gray-50 transition-colors shadow-sm">
+            <FiFilter size={14} /> 필터
+          </button>
+          <button className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-sm text-ui hover:bg-gray-50 transition-colors shadow-sm">
+            <FiDownload size={14} /> 내보내기
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-md shadow-floating border border-gray-100 flex-1 overflow-hidden flex flex-col">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-ui">
+            <thead className="bg-gray-50 text-neutral-meta border-b border-gray-100">
+              <tr>
+                <th className="px-6 py-4 font-medium w-1/4">프로젝트명</th>
+                <th className="px-6 py-4 font-medium w-1/3">설명</th>
+                <th className="px-6 py-4 font-medium">생성일</th>
+                <th className="px-6 py-4 font-medium">생성자</th>
+                <th className="px-6 py-4 font-medium">상태</th>
+                <th className="px-6 py-4 font-medium text-right">관리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 text-neutral-main">
+              {isLoading ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-neutral-meta">
+                    데이터를 불러오는 중입니다...
+                  </td>
+                </tr>
+              ) : projects.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-neutral-meta">
+                    등록된 프로젝트가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                projects.map((project) => (
+                  <tr key={project.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-6 py-4 font-semibold text-neutral-main">{project.name}</td>
+                    <td className="px-6 py-4 text-neutral-meta truncate max-w-xs">{project.description || '-'}</td>
+                    <td className="px-6 py-4 text-neutral-meta">{project.createdAt}</td>
+                    <td className="px-6 py-4 text-neutral-meta">{project.createdBy}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[12px] font-medium ${
+                        project.status === '활성' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {project.status || '대기'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button className="p-1.5 text-gray-400 hover:text-primary hover:bg-blue-50 rounded-sm transition-colors opacity-0 group-hover:opacity-100">
+                        <FiMoreVertical size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

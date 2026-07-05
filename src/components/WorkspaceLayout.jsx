@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { FiFileText, FiTrello, FiMessageSquare, FiEdit3, FiPlus } from 'react-icons/fi';
 import GlobalHeader from './GlobalHeader';
 import ConfluencePanel from './ConfluencePanel';
-import JiraPanel from './JiraPanel';
+import ProjectCreateModal from './ProjectCreateModal';
+import ProjectInviteModal from './ProjectInviteModal';
 
 export default function WorkspaceLayout() {
   const [isLnbOpen, setIsLnbOpen] = useState(true);
@@ -13,6 +14,14 @@ export default function WorkspaceLayout() {
   const [hasProject, setHasProject] = useState(() => {
     return localStorage.getItem('kivo_has_project') === 'true';
   });
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+
+  const handleProjectSuccess = () => {
+    setIsProjectModalOpen(false);
+    setHasProject(true);
+    localStorage.setItem('kivo_has_project', 'true');
+  };
 
   // 화면 크기에 따른 LNB 자동 개폐 로직
   useEffect(() => {
@@ -31,7 +40,11 @@ export default function WorkspaceLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-bg-panel text-neutral-main font-sans selection:bg-primary selection:text-white relative">
-      <GlobalHeader onToggleLnb={() => setIsLnbOpen(!isLnbOpen)} hasProject={hasProject} />
+      <GlobalHeader 
+        onToggleLnb={() => setIsLnbOpen(!isLnbOpen)} 
+        hasProject={hasProject} 
+        onOpenCreateProject={() => setIsProjectModalOpen(true)}
+      />
       
       {/* Mobile Tab Switcher (Visible only on < md screens & when project exists) */}
       {hasProject && (
@@ -75,10 +88,7 @@ export default function WorkspaceLayout() {
             <h2 className="text-[22px] font-bold text-neutral-main mb-3">진행할 프로젝트를 등록하세요.</h2>
             <p className="text-neutral-meta mb-8 text-[15px]">현재 참여 중이거나 진행 중인 프로젝트가 없습니다.<br/>새로운 프로젝트를 생성하고 팀과 함께 협업을 시작해 보세요!</p>
             <button 
-              onClick={() => {
-                setHasProject(true);
-                localStorage.setItem('kivo_has_project', 'true');
-              }}
+              onClick={() => setIsProjectModalOpen(true)}
               className="flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-sm font-bold text-[15px] hover:bg-blue-700 transition-colors shadow-sm active:scale-95"
             >
               <FiPlus size={20} /> 프로젝트 등록
@@ -86,18 +96,11 @@ export default function WorkspaceLayout() {
           </div>
         ) : (
           <div className="flex h-full w-full animate-fade-in">
-            {/* Confluence Panel: Hidden on mobile if not 'document' tab */}
-            <section className={`flex-1 md:flex-[6] min-w-0 h-full bg-bg-panel overflow-hidden relative border-r border-gray-200 ${
+            {/* Main Area: Confluence Panel spans full width */}
+            <section className={`flex-1 min-w-0 h-full bg-bg-panel overflow-hidden relative ${
               activeMobileTab === 'document' ? 'flex' : 'hidden'
             } md:flex`}>
-               <ConfluencePanel isLnbOpen={isLnbOpen} />
-            </section>
-
-            {/* Jira Panel: Hidden on mobile if not 'board' tab */}
-            <section className={`flex-1 md:flex-[4] min-w-0 h-full bg-bg-panel overflow-hidden relative ${
-              activeMobileTab === 'board' ? 'flex' : 'hidden'
-            } md:flex`}>
-               <JiraPanel />
+               <ConfluencePanel isLnbOpen={isLnbOpen} onOpenInviteModal={() => setIsInviteModalOpen(true)} />
             </section>
           </div>
         )}
@@ -126,8 +129,7 @@ export default function WorkspaceLayout() {
         </div>
         <div className="p-5 h-full overflow-y-auto pb-10">
           <div className="flex items-center gap-2 mb-4">
-            <span className="bg-blue-100 text-blue-600 px-2 py-0.5 rounded text-[11px] font-bold uppercase">Action</span>
-            <span className="text-ui text-neutral-meta">QUICK-101</span>
+            <h3 className="font-bold text-lg">새로 만들기</h3>
           </div>
           <h2 className="text-h2 mb-2">퀵 액션 시트</h2>
           <div className="text-sm text-neutral-meta bg-bg-panel p-3 rounded">
@@ -135,6 +137,17 @@ export default function WorkspaceLayout() {
           </div>
         </div>
       </div>
+      
+      <ProjectCreateModal 
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
+        onSuccess={handleProjectSuccess}
+      />
+
+      <ProjectInviteModal 
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+      />
     </div>
   );
 }

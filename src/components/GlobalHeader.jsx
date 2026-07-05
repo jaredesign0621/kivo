@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FiGrid, FiSettings, FiChevronDown, FiSidebar, FiMenu } from 'react-icons/fi';
 import logoUrl from '../assets/img/logo.png';
 
-export default function GlobalHeader({ onToggleLnb, hasProject = true }) {
+export default function GlobalHeader({ onToggleLnb, hasProject = true, onOpenCreateProject }) {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
   const projectMenuRef = useRef(null);
 
@@ -68,7 +68,15 @@ export default function GlobalHeader({ onToggleLnb, hasProject = true }) {
                   </div>
                   <div className="border-t border-gray-100 mt-2 pt-2">
                     <button className="w-full text-left px-4 py-2 text-[14px] text-neutral-main hover:bg-gray-50 hover:text-primary transition-colors">모든 프로젝트 보기</button>
-                    <button className="w-full text-left px-4 py-2 text-[14px] text-neutral-main hover:bg-gray-50 hover:text-primary transition-colors">프로젝트 만들기</button>
+                    <button 
+                      className="w-full text-left px-4 py-2 text-[14px] text-neutral-main hover:bg-gray-50 hover:text-primary transition-colors"
+                      onClick={() => {
+                        setIsProjectMenuOpen(false);
+                        if(onOpenCreateProject) onOpenCreateProject();
+                      }}
+                    >
+                      프로젝트 만들기
+                    </button>
                   </div>
                 </div>
               )}
