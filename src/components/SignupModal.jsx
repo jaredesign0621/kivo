@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiX, FiCheck, FiCamera } from 'react-icons/fi';
+import { FiX, FiCheck, FiCamera, FiLoader } from 'react-icons/fi';
+import { auth, db, storage } from '../firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function SignupModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({
@@ -19,6 +23,8 @@ export default function SignupModal({ isOpen, onClose }) {
 
   const [idChecked, setIdChecked] = useState(false);
   const [profilePreview, setProfilePreview] = useState(null);
+  const [profileFile, setProfileFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
   
   // 모달이 열리고 닫힐 때 스크롤 방지
@@ -56,17 +62,29 @@ export default function SignupModal({ isOpen, onClose }) {
     });
   };
 
-  const checkIdDuplicate = () => {
+  const checkIdDuplicate = async () => {
     if (!formData.id.trim()) {
       alert('아이디를 입력해주세요.');
       return;
     }
-    // 임시 로직
-    alert('사용 가능한 아이디입니다.');
-    setIdChecked(true);
+    
+    try {
+      const docRef = doc(db, 'users', formData.id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        alert('이미 사용중인 아이디입니다.');
+        setIdChecked(false);
+      } else {
+        alert('사용 가능한 아이디입니다.');
+        setIdChecked(true);
+      }
+    } catch (error) {
+      console.error('Error checking duplicate ID:', error);
+      alert('중복 확인 중 오류가 발생했습니다.');
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!idChecked) {
       alert('아이디 중복확인을 진행해주세요.');
@@ -81,8 +99,48 @@ export default function SignupModal({ isOpen, onClose }) {
       return;
     }
     
-    alert('회원가입이 완료되었습니다!');
-    onClose();
+    setIsLoading(true);
+    
+    try {
+      // 1. 프로필 이미지 업로드 (선택사항)
+      let profileUrl = null;
+      if (profileFile) {
+        const storageRef = ref(storage, `profiles/${formData.id}_${Date.now()}`);
+        await uploadBytes(storageRef, profileFile);
+        profileUrl = await getDownloadURL(storageRef);
+      }
+
+      // 2. Firebase Auth 가입 (가상 이메일 사용)
+      const virtualEmail = `${formData.id}@kivo.com`;
+      await createUserWithEmailAndPassword(auth, virtualEmail, formData.password);
+
+      // 3. Firestore 사용자 데이터 저장
+      const today = new Date();
+      const formattedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      
+      await setDoc(doc(db, 'users', formData.id), {
+        id: formData.id,
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        profileUrl: profileUrl,
+        marketing: agreements.marketing ? 'Y' : 'N',
+        date: formattedDate,
+        status: '활성'
+      });
+
+      alert('회원가입이 완료되었습니다!');
+      onClose();
+    } catch (error) {
+      console.error('Error during signup:', error);
+      if (error.code === 'auth/email-already-in-use') {
+         alert('이미 가입된 아이디입니다.');
+      } else {
+         alert('회원가입 중 오류가 발생했습니다: ' + error.message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // 비밀번호 일치 여부 확인
@@ -92,6 +150,7 @@ export default function SignupModal({ isOpen, onClose }) {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setProfileFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setProfilePreview(reader.result);

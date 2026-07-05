@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FiGrid, FiSettings, FiChevronDown, FiSidebar, FiMenu } from 'react-icons/fi';
 import logoUrl from '../assets/img/logo.png';
 
-export default function GlobalHeader({ onToggleLnb }) {
+export default function GlobalHeader({ onToggleLnb, hasProject = true }) {
+  const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
+  const projectMenuRef = useRef(null);
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (projectMenuRef.current && !projectMenuRef.current.contains(event.target)) {
+        setIsProjectMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <header className="h-14 px-4 bg-white border-b border-gray-200 flex items-center justify-between shrink-0 z-50">
       
@@ -29,24 +43,51 @@ export default function GlobalHeader({ onToggleLnb }) {
         </div>
 
         {/* Navigation Dropdowns (PC Only) */}
-        <nav className="hidden lg:flex h-full text-ui">
-          <button className="px-3 h-full flex items-center gap-1 hover:bg-gray-100 hover:text-primary transition-colors text-neutral-main">
-            프로젝트 <FiChevronDown size={14} className="text-neutral-meta" />
-          </button>
-          <button className="px-3 h-full flex items-center gap-1 hover:bg-gray-100 hover:text-primary transition-colors text-neutral-main">
-            대시보드 <FiChevronDown size={14} className="text-neutral-meta" />
-          </button>
-          <button className="px-3 h-full flex items-center gap-1 hover:bg-gray-100 hover:text-primary transition-colors text-neutral-main">
-            앱 <FiChevronDown size={14} className="text-neutral-meta" />
-          </button>
-          
-          {/* Create Button */}
-          <div className="flex items-center ml-2">
-            <button className="bg-primary hover:bg-blue-700 text-white font-medium px-3 py-1.5 rounded-sm transition-colors shadow-sm">
-              만들기
+        {hasProject && (
+          <nav className="hidden lg:flex h-full text-ui">
+            {/* 프로젝트 GNB */}
+            <div className="relative h-full flex" ref={projectMenuRef}>
+              <button 
+                onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
+                className={`px-3 h-full flex items-center gap-1 transition-colors ${
+                  isProjectMenuOpen ? 'bg-blue-50 text-primary' : 'hover:bg-gray-100 hover:text-primary text-neutral-main'
+                }`}
+              >
+                프로젝트 <FiChevronDown size={14} className={`${isProjectMenuOpen ? 'text-primary' : 'text-neutral-meta'}`} />
+              </button>
+              
+              {/* 프로젝트 드롭다운 메뉴 */}
+              {isProjectMenuOpen && (
+                <div className="absolute top-[100%] left-0 mt-1 w-64 bg-white border border-gray-200 rounded-sm shadow-floating py-2 z-50 animate-fade-in">
+                  <div className="px-4 py-1.5 text-[12px] font-bold text-neutral-meta uppercase">최근 프로젝트</div>
+                  <div className="flex flex-col mt-1">
+                    <button className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-3 group">
+                      <div className="w-7 h-7 rounded-sm bg-blue-100 text-primary flex items-center justify-center font-bold text-[14px]">K</div>
+                      <span className="text-[14px] text-neutral-main font-medium group-hover:text-primary transition-colors">KIVO 프로젝트</span>
+                    </button>
+                  </div>
+                  <div className="border-t border-gray-100 mt-2 pt-2">
+                    <button className="w-full text-left px-4 py-2 text-[14px] text-neutral-main hover:bg-gray-50 hover:text-primary transition-colors">모든 프로젝트 보기</button>
+                    <button className="w-full text-left px-4 py-2 text-[14px] text-neutral-main hover:bg-gray-50 hover:text-primary transition-colors">프로젝트 만들기</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button className="px-3 h-full flex items-center gap-1 hover:bg-gray-100 hover:text-primary transition-colors text-neutral-main">
+              대시보드 <FiChevronDown size={14} className="text-neutral-meta" />
             </button>
-          </div>
-        </nav>
+            <button className="px-3 h-full flex items-center gap-1 hover:bg-gray-100 hover:text-primary transition-colors text-neutral-main">
+              앱 <FiChevronDown size={14} className="text-neutral-meta" />
+            </button>
+            
+            {/* Create Button */}
+            <div className="flex items-center ml-2">
+              <button className="bg-primary hover:bg-blue-700 text-white font-medium px-3 py-1.5 rounded-sm transition-colors shadow-sm">
+                만들기
+              </button>
+            </div>
+          </nav>
+        )}
       </div>
 
       {/* Right Section: Tools */}

@@ -8,6 +8,11 @@ export default function WorkspaceLayout() {
   const [isLnbOpen, setIsLnbOpen] = useState(true);
   const [activeMobileTab, setActiveMobileTab] = useState('document');
   const [isBottomSheetOpen, setBottomSheetOpen] = useState(false);
+  
+  // 로컬 스토리지를 이용해 프로젝트가 있는지(생성했는지) 상태를 기억하도록 시뮬레이션합니다.
+  const [hasProject, setHasProject] = useState(() => {
+    return localStorage.getItem('kivo_has_project') === 'true';
+  });
 
   // 화면 크기에 따른 LNB 자동 개폐 로직
   useEffect(() => {
@@ -26,10 +31,11 @@ export default function WorkspaceLayout() {
 
   return (
     <div className="h-screen flex flex-col bg-bg-panel text-neutral-main font-sans selection:bg-primary selection:text-white relative">
-      <GlobalHeader onToggleLnb={() => setIsLnbOpen(!isLnbOpen)} />
+      <GlobalHeader onToggleLnb={() => setIsLnbOpen(!isLnbOpen)} hasProject={hasProject} />
       
-      {/* Mobile Tab Switcher (Visible only on < md screens) */}
-      <div className="md:hidden sticky top-0 z-40 bg-bg-base border-b border-gray-200 px-4 pt-2 pb-2 shadow-sm">
+      {/* Mobile Tab Switcher (Visible only on < md screens & when project exists) */}
+      {hasProject && (
+        <div className="md:hidden sticky top-0 z-40 bg-bg-base border-b border-gray-200 px-4 pt-2 pb-2 shadow-sm">
         <div className="flex bg-gray-100 p-1 rounded-md">
           <button 
             onClick={() => setActiveMobileTab('document')}
@@ -57,33 +63,55 @@ export default function WorkspaceLayout() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Main Content Area */}
       <main className="w-full flex-1 min-h-0">
-        <div className="flex h-full w-full">
-          {/* Confluence Panel: Hidden on mobile if not 'document' tab */}
-          <section className={`flex-1 md:flex-[6] min-w-0 h-full bg-bg-panel overflow-hidden relative border-r border-gray-200 ${
-            activeMobileTab === 'document' ? 'flex' : 'hidden'
-          } md:flex`}>
-             <ConfluencePanel isLnbOpen={isLnbOpen} />
-          </section>
+        {!hasProject ? (
+          <div className="flex flex-col items-center justify-center h-full w-full bg-white text-center px-4">
+            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-6 shadow-sm border border-gray-100">
+              <FiTrello size={36} className="text-gray-400" />
+            </div>
+            <h2 className="text-[22px] font-bold text-neutral-main mb-3">진행할 프로젝트를 등록하세요.</h2>
+            <p className="text-neutral-meta mb-8 text-[15px]">현재 참여 중이거나 진행 중인 프로젝트가 없습니다.<br/>새로운 프로젝트를 생성하고 팀과 함께 협업을 시작해 보세요!</p>
+            <button 
+              onClick={() => {
+                setHasProject(true);
+                localStorage.setItem('kivo_has_project', 'true');
+              }}
+              className="flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-sm font-bold text-[15px] hover:bg-blue-700 transition-colors shadow-sm active:scale-95"
+            >
+              <FiPlus size={20} /> 프로젝트 등록
+            </button>
+          </div>
+        ) : (
+          <div className="flex h-full w-full animate-fade-in">
+            {/* Confluence Panel: Hidden on mobile if not 'document' tab */}
+            <section className={`flex-1 md:flex-[6] min-w-0 h-full bg-bg-panel overflow-hidden relative border-r border-gray-200 ${
+              activeMobileTab === 'document' ? 'flex' : 'hidden'
+            } md:flex`}>
+               <ConfluencePanel isLnbOpen={isLnbOpen} />
+            </section>
 
-          {/* Jira Panel: Hidden on mobile if not 'board' tab */}
-          <section className={`flex-1 md:flex-[4] min-w-0 h-full bg-bg-panel overflow-hidden relative ${
-            activeMobileTab === 'board' ? 'flex' : 'hidden'
-          } md:flex`}>
-             <JiraPanel />
-          </section>
-        </div>
+            {/* Jira Panel: Hidden on mobile if not 'board' tab */}
+            <section className={`flex-1 md:flex-[4] min-w-0 h-full bg-bg-panel overflow-hidden relative ${
+              activeMobileTab === 'board' ? 'flex' : 'hidden'
+            } md:flex`}>
+               <JiraPanel />
+            </section>
+          </div>
+        )}
       </main>
 
       {/* Mobile Floating Action Button (FAB) */}
-      <button 
-        className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full flex items-center justify-center shadow-floating hover:bg-blue-700 active:scale-95 transition-all z-40"
-        onClick={() => setBottomSheetOpen(true)}
-      >
-        {activeMobileTab === 'document' ? <FiEdit3 size={24} /> : <FiPlus size={24} />}
-      </button>
+      {hasProject && (
+        <button 
+          className="md:hidden fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full flex items-center justify-center shadow-floating hover:bg-blue-700 active:scale-95 transition-all z-40"
+          onClick={() => setBottomSheetOpen(true)}
+        >
+          {activeMobileTab === 'document' ? <FiEdit3 size={24} /> : <FiPlus size={24} />}
+        </button>
+      )}
 
       {/* Mobile Bottom Sheet (Visible only on < md screens when triggered) */}
       <div 

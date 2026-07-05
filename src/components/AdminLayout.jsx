@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { 
+import React, { useState, useEffect } from 'react';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { db } from '../firebase';
+import {
   FiHome, 
   FiUsers, 
   FiFileText, 
@@ -277,14 +279,34 @@ function PlaceholderContent({ label }) {
 }
 
 function UsersManagementContent() {
-  // 가상의 사용자 데이터 목록
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), orderBy('date', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const usersData = [];
+      querySnapshot.forEach((doc) => {
+        usersData.push(doc.data());
+      });
+      setUsers(usersData);
+      setIsLoading(false);
+    }, (error) => {
+      console.error("Error fetching users: ", error);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 로컬 개발 환경일 때 UI 수정을 위해 더미 데이터를 추가로 보여줍니다.
   const dummyUsers = [
-    { id: 'admin', name: '최고 관리자', profileUrl: 'https://i.pravatar.cc/150?u=admin', phone: '010-0000-0000', email: 'admin@kivo.com', date: '2026-07-01', marketing: 'N', status: '활성' },
-    { id: 'tester1', name: '김테스트', profileUrl: null, phone: '010-1234-5678', email: 'tester1@kivo.com', date: '2026-07-05', marketing: 'Y', status: '활성' },
-    { id: 'devlee', name: '이개발', profileUrl: 'https://i.pravatar.cc/150?u=devlee', phone: '010-9876-5432', email: 'devlee@example.com', date: '2026-07-04', marketing: 'N', status: '활성' },
-    { id: 'designpark', name: '박디자인', profileUrl: 'https://i.pravatar.cc/150?u=designpark', phone: '010-1111-2222', email: 'park@example.com', date: '2026-07-03', marketing: 'Y', status: '대기중' },
-    { id: 'baduser', name: '정태호', profileUrl: null, phone: '010-9999-8888', email: 'taeho99@example.com', date: '2026-07-02', marketing: 'N', status: '정지' },
+    { id: 'admin_dummy', name: '최고 관리자(더미)', profileUrl: 'https://i.pravatar.cc/150?u=admin', phone: '010-0000-0000', email: 'admin@kivo.com', date: '2026-07-01', marketing: 'N', status: '활성' },
+    { id: 'tester_dummy', name: '김테스트(더미)', profileUrl: null, phone: '010-1234-5678', email: 'tester1@kivo.com', date: '2026-07-05', marketing: 'Y', status: '활성' },
+    { id: 'devlee_dummy', name: '이개발(더미)', profileUrl: 'https://i.pravatar.cc/150?u=devlee', phone: '010-9876-5432', email: 'devlee@example.com', date: '2026-07-04', marketing: 'N', status: '활성' }
   ];
+
+  const displayUsers = import.meta.env.DEV ? [...users, ...dummyUsers] : users;
 
   return (
     <div className="flex flex-col h-full bg-white overflow-hidden">
@@ -294,7 +316,7 @@ function UsersManagementContent() {
         <div className="flex items-center gap-2">
           <span className="text-ui font-semibold text-neutral-main">총 사용자</span>
           <span className="px-2 py-0.5 bg-blue-100 text-primary text-[12px] font-bold rounded-full">
-            {dummyUsers.length}명
+            {isLoading ? '...' : displayUsers.length}명
           </span>
         </div>
         
@@ -335,57 +357,67 @@ function UsersManagementContent() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 border-b border-gray-100 text-neutral-main">
-            {dummyUsers.map((user, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors group">
-                <td className="px-5 py-3 text-center">
-                  <input type="checkbox" className="w-4 h-4 rounded-sm border-gray-300" />
-                </td>
-                <td className="px-5 py-3 font-medium text-primary cursor-pointer hover:underline">{user.id}</td>
-                <td className="px-5 py-3 font-medium">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 border border-gray-100">
-                      {user.profileUrl ? (
-                        <img src={user.profileUrl} alt={user.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-[12px] font-bold text-gray-500">{user.name.charAt(0)}</span>
-                      )}
-                    </div>
-                    {user.name}
-                  </div>
-                </td>
-                <td className="px-5 py-3 text-neutral-meta">{user.phone}</td>
-                <td className="px-5 py-3 text-neutral-meta">{user.email}</td>
-                <td className="px-5 py-3 text-center">
-                  {user.marketing === 'Y' ? (
-                    <span className="text-green-600 font-bold text-[12px] bg-green-50 px-2 py-0.5 rounded-sm">Y</span>
-                  ) : (
-                    <span className="text-gray-400 font-medium text-[12px]">N</span>
-                  )}
-                </td>
-                <td className="px-5 py-3 text-neutral-meta text-[13px]">{user.date}</td>
-                <td className="px-5 py-3">
-                  <span className={`px-2.5 py-1 rounded-full text-[12px] font-medium ${
-                    user.status === '활성' ? 'bg-green-100 text-green-700' :
-                    user.status === '대기중' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {user.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-center">
-                  <button className="p-1.5 text-gray-400 hover:text-neutral-main hover:bg-gray-200 rounded-sm transition-colors opacity-0 group-hover:opacity-100">
-                    <FiMoreVertical size={16} />
-                  </button>
-                </td>
+            {isLoading ? (
+              <tr>
+                <td colSpan="9" className="px-5 py-10 text-center text-gray-400">데이터를 불러오는 중입니다...</td>
               </tr>
-            ))}
+            ) : displayUsers.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="px-5 py-10 text-center text-gray-400">등록된 사용자가 없습니다.</td>
+              </tr>
+            ) : (
+              displayUsers.map((user, idx) => (
+                <tr key={user.id || idx} className="hover:bg-gray-50 transition-colors group">
+                  <td className="px-5 py-3 text-center">
+                    <input type="checkbox" className="w-4 h-4 rounded-sm border-gray-300" />
+                  </td>
+                  <td className="px-5 py-3 font-medium text-primary cursor-pointer hover:underline">{user.id}</td>
+                  <td className="px-5 py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden shrink-0 border border-gray-100">
+                        {user.profileUrl ? (
+                          <img src={user.profileUrl} alt={user.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[12px] font-bold text-gray-500">{user.name?.charAt(0)}</span>
+                        )}
+                      </div>
+                      {user.name}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-neutral-meta">{user.phone}</td>
+                  <td className="px-5 py-3 text-neutral-meta">{user.email}</td>
+                  <td className="px-5 py-3 text-center">
+                    {user.marketing === 'Y' ? (
+                      <span className="text-green-600 font-bold text-[12px] bg-green-50 px-2 py-0.5 rounded-sm">Y</span>
+                    ) : (
+                      <span className="text-gray-400 font-medium text-[12px]">N</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-neutral-meta text-[13px]">{user.date}</td>
+                  <td className="px-5 py-3">
+                    <span className={`px-2.5 py-1 rounded-full text-[12px] font-medium ${
+                      user.status === '활성' ? 'bg-green-100 text-green-700' :
+                      user.status === '대기중' ? 'bg-yellow-100 text-yellow-700' :
+                      'bg-red-100 text-red-700'
+                    }`}>
+                      {user.status || '활성'}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <button className="p-1.5 text-gray-400 hover:text-neutral-main hover:bg-gray-200 rounded-sm transition-colors opacity-0 group-hover:opacity-100">
+                      <FiMoreVertical size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
       {/* Pagination Footer */}
       <div className="mx-6 px-5 py-3 border-y border-gray-200 bg-white flex items-center justify-between text-[13px] text-neutral-meta mb-6">
-        <span>1 - 5 / 총 5 명</span>
+        <span>{displayUsers.length > 0 ? `1 - ${displayUsers.length}` : '0'} / 총 {displayUsers.length} 명</span>
         <div className="flex gap-1">
           <button className="px-2 py-1 border border-gray-200 rounded-sm bg-white hover:bg-gray-50 disabled:opacity-50" disabled>이전</button>
           <button className="px-2 py-1 border border-gray-200 rounded-sm bg-white hover:bg-gray-50 disabled:opacity-50" disabled>다음</button>
