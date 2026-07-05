@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
 import WorkspaceLayout from './components/WorkspaceLayout';
+import AdminLayout from './components/AdminLayout';
 import Login from './components/Login';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState(null); // 'admin', 'user', or null
 
   return (
     <>
-      {isLoggedIn ? (
+      {userRole === 'admin' ? (
+        <AdminLayout />
+      ) : userRole === 'user' ? (
         <WorkspaceLayout />
       ) : (
-        <Login onLogin={() => setIsLoggedIn(true)} />
+        <Login onLogin={(role) => setUserRole(role)} />
       )}
     </>
   );

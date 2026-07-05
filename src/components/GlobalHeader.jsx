@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiGrid, FiSettings, FiChevronDown, FiSidebar, FiMenu } from 'react-icons/fi';
+import logoUrl from '../assets/img/logo.png';
 
 export default function GlobalHeader({ onToggleLnb }) {
   return (
@@ -24,10 +25,7 @@ export default function GlobalHeader({ onToggleLnb }) {
         
         {/* Logo */}
         <div className="flex items-center gap-1.5 cursor-pointer md:mr-6">
-          <div className="w-7 h-7 bg-primary rounded-sm flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-[14px]">K</span>
-          </div>
-          <span className="text-h2 font-bold text-neutral-main tracking-tight hidden sm:block">KIVO</span>
+          <img src={logoUrl} alt="KIVO Logo" className="h-7 shrink-0 object-contain" />
         </div>
 
         {/* Navigation Dropdowns (PC Only) */}
