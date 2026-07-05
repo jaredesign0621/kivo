@@ -4,23 +4,26 @@ import GlobalHeader from './GlobalHeader';
 import ConfluencePanel from './ConfluencePanel';
 import ProjectCreateModal from './ProjectCreateModal';
 import ProjectInviteModal from './ProjectInviteModal';
+import { auth } from '../firebase';
 
 export default function WorkspaceLayout() {
   const [isLnbOpen, setIsLnbOpen] = useState(true);
   const [activeMobileTab, setActiveMobileTab] = useState('document');
   const [isBottomSheetOpen, setBottomSheetOpen] = useState(false);
   
-  // 로컬 스토리지를 이용해 프로젝트가 있는지(생성했는지) 상태를 기억하도록 시뮬레이션합니다.
+  // 로컬 스토리지를 이용해 프로젝트가 있는지(생성했는지) 상태를 기억하도록 시뮬레이션합니다. (계정별 분리)
   const [hasProject, setHasProject] = useState(() => {
-    return localStorage.getItem('kivo_has_project') === 'true';
+    const userId = auth.currentUser?.uid || 'guest';
+    return localStorage.getItem(`kivo_has_project_${userId}`) === 'true';
   });
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   const handleProjectSuccess = () => {
+    const userId = auth.currentUser?.uid || 'guest';
     setIsProjectModalOpen(false);
     setHasProject(true);
-    localStorage.setItem('kivo_has_project', 'true');
+    localStorage.setItem(`kivo_has_project_${userId}`, 'true');
   };
 
   // 화면 크기에 따른 LNB 자동 개폐 로직

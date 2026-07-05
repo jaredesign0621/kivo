@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
+import { signOut } from 'firebase/auth';
 import {
   FiHome, 
   FiUsers, 
@@ -20,7 +22,22 @@ import {
 import logoUrl from '../assets/img/logo.png';
 
 export default function AdminLayout() {
-  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // URL에서 현재 메뉴 추출 (예: /admin/users -> users)
+  const pathParts = location.pathname.split('/');
+  const activeMenu = pathParts[pathParts.length - 1] || 'dashboard';
+
+  const handleLogout = async () => {
+    try {
+      localStorage.removeItem('kivo_local_role');
+      await signOut(auth);
+      window.location.reload();
+    } catch (error) {
+      console.error('로그아웃 중 에러 발생:', error);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-bg-panel text-body selection:bg-primary selection:text-white">
@@ -38,27 +55,27 @@ export default function AdminLayout() {
           <MenuButton 
             icon={<FiHome />} label="대시보드" 
             isActive={activeMenu === 'dashboard'} 
-            onClick={() => setActiveMenu('dashboard')} 
+            onClick={() => navigate('/admin/dashboard')} 
           />
           <MenuButton 
             icon={<FiUsers />} label="사용자 관리" 
             isActive={activeMenu === 'users'} 
-            onClick={() => setActiveMenu('users')} 
+            onClick={() => navigate('/admin/users')} 
           />
           <MenuButton 
             icon={<FiBox />} label="프로젝트 관리" 
             isActive={activeMenu === 'projects'} 
-            onClick={() => setActiveMenu('projects')} 
+            onClick={() => navigate('/admin/projects')} 
           />
           <MenuButton 
             icon={<FiFileText />} label="콘텐츠 관리" 
             isActive={activeMenu === 'content'} 
-            onClick={() => setActiveMenu('content')} 
+            onClick={() => navigate('/admin/content')} 
           />
           <MenuButton 
             icon={<FiSettings />} label="시스템 설정" 
             isActive={activeMenu === 'settings'} 
-            onClick={() => setActiveMenu('settings')} 
+            onClick={() => navigate('/admin/settings')} 
           />
         </nav>
 
@@ -74,7 +91,7 @@ export default function AdminLayout() {
             </div>
           </div>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={handleLogout}
             className="flex items-center justify-center gap-2 w-full py-2 text-ui text-neutral-meta hover:text-red-600 hover:bg-red-50 rounded-sm transition-colors"
           >
             <FiLogOut /> 로그아웃
@@ -113,18 +130,26 @@ export default function AdminLayout() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-auto bg-gray-50">
-          {activeMenu === 'dashboard' && (
-            <div className="p-6 h-full">
-              <DashboardContent />
-            </div>
-          )}
-          {activeMenu === 'users' && <UsersManagementContent />}
-          {activeMenu === 'projects' && <ProjectsManagementContent />}
-          {activeMenu !== 'dashboard' && activeMenu !== 'users' && activeMenu !== 'projects' && (
-            <div className="p-6 h-full">
-              <PlaceholderContent label={activeMenu} />
-            </div>
-          )}
+          <Routes>
+            <Route path="dashboard" element={
+              <div className="p-6 h-full">
+                <DashboardContent />
+              </div>
+            } />
+            <Route path="users" element={<UsersManagementContent />} />
+            <Route path="projects" element={<ProjectsManagementContent />} />
+            <Route path="content" element={
+              <div className="p-6 h-full">
+                <PlaceholderContent label="콘텐츠 관리" />
+              </div>
+            } />
+            <Route path="settings" element={
+              <div className="p-6 h-full">
+                <PlaceholderContent label="시스템 설정" />
+              </div>
+            } />
+            <Route path="*" element={<Navigate to="dashboard" replace />} />
+          </Routes>
         </div>
       </main>
     </div>
@@ -149,14 +174,60 @@ function MenuButton({ icon, label, isActive, onClick }) {
 }
 
 function DashboardContent() {
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    newUsersToday: 0,
+    totalProjects: 0,
+  });
+  const [recentUsers, setRecentUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // 유저 데이터 리얼타임 구독
+    const usersUnsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      const totalUsers = usersData.length;
+      
+      // 오늘 가입자 계산 (가입일이 YYYY-MM-DD 형태라고 가정)
+      const today = new Date();
+      // YYYY-MM-DD 포맷을 로컬 기준으로 맞추기 위함
+      const offset = today.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(today - offset)).toISOString().split('T')[0];
+      
+      const newUsersToday = usersData.filter(u => u.date && u.date.startsWith(localISOTime)).length;
+      
+      // 최근 가입자 5명 추출
+      const sorted = [...usersData].sort((a, b) => {
+        const dateA = a.date || '1970-01-01';
+        const dateB = b.date || '1970-01-01';
+        return dateB.localeCompare(dateA);
+      });
+      
+      setRecentUsers(sorted.slice(0, 5));
+      setStats(prev => ({ ...prev, totalUsers, newUsersToday }));
+    });
+
+    // 프로젝트 데이터 리얼타임 구독
+    const projectsUnsubscribe = onSnapshot(collection(db, 'projects'), (snapshot) => {
+      setStats(prev => ({ ...prev, totalProjects: snapshot.docs.length }));
+      setIsLoading(false);
+    });
+
+    return () => {
+      usersUnsubscribe();
+      projectsUnsubscribe();
+    };
+  }, []);
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <MetricCard title="총 가입자 수" value="12,405" change="+12%" icon={<FiUsers className="text-blue-500" />} trend="up" />
-        <MetricCard title="오늘 신규 가입" value="142" change="+5.4%" icon={<FiUserPlus className="text-green-500" />} trend="up" />
-        <MetricCard title="활성 프로젝트" value="3,820" change="-1.2%" icon={<FiBox className="text-purple-500" />} trend="down" />
+        <MetricCard title="총 가입자 수" value={isLoading ? '...' : stats.totalUsers.toLocaleString()} change="실시간" icon={<FiUsers className="text-blue-500" />} trend="neutral" />
+        <MetricCard title="오늘 신규 가입" value={isLoading ? '...' : stats.newUsersToday.toLocaleString()} change="실시간" icon={<FiUserPlus className="text-green-500" />} trend="neutral" />
+        <MetricCard title="활성 프로젝트" value={isLoading ? '...' : stats.totalProjects.toLocaleString()} change="실시간" icon={<FiBox className="text-purple-500" />} trend="neutral" />
         <MetricCard title="서버 상태" value="정상" change="99.9% Uptime" icon={<FiActivity className="text-teal-500" />} trend="neutral" />
       </div>
 
@@ -164,12 +235,11 @@ function DashboardContent() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         
         {/* Recent Users Table (Takes 2 columns on large screens) */}
-        <div className="xl:col-span-2 bg-white rounded-md shadow-floating border border-gray-100 overflow-hidden">
+        <div className="xl:col-span-2 bg-white rounded-md shadow-floating border border-gray-100 overflow-hidden flex flex-col">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-neutral-main">최근 가입 사용자</h2>
-            <button className="text-ui text-primary hover:underline">모두 보기</button>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="w-full text-left text-ui">
               <thead className="bg-gray-50 text-neutral-meta border-b border-gray-100">
                 <tr>
@@ -180,11 +250,25 @@ function DashboardContent() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-neutral-main">
-                <UserRow name="김지수" email="jisoo@example.com" date="2026-07-05" status="활성" />
-                <UserRow name="이민호" email="minho.lee@example.com" date="2026-07-04" status="활성" />
-                <UserRow name="박서준" email="seojun.p@example.com" date="2026-07-04" status="대기중" />
-                <UserRow name="최유진" email="yujin.choi@example.com" date="2026-07-03" status="활성" />
-                <UserRow name="정태호" email="taeho99@example.com" date="2026-07-02" status="정지" />
+                {isLoading ? (
+                  <tr>
+                    <td colSpan="4" className="text-center py-8 text-neutral-meta">데이터를 불러오는 중입니다...</td>
+                  </tr>
+                ) : recentUsers.length > 0 ? (
+                  recentUsers.map(user => (
+                    <UserRow 
+                      key={user.id}
+                      name={user.name || user.username || '이름 없음'} 
+                      email={user.email} 
+                      date={user.date || '날짜 없음'} 
+                      status={user.status || '활성'} 
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="4" className="text-center py-8 text-neutral-meta">최근 가입한 사용자가 없습니다.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -196,10 +280,9 @@ function DashboardContent() {
             <h2 className="font-semibold text-neutral-main">시스템 알림</h2>
           </div>
           <div className="flex-1 p-5 space-y-4">
-            <LogItem type="warning" message="데이터베이스 백업 지연됨" time="10분 전" />
-            <LogItem type="success" message="새로운 배포 완료 (v1.2.4)" time="1시간 전" />
-            <LogItem type="info" message="정기 서버 점검 안내" time="3시간 전" />
-            <LogItem type="error" message="결제 API 응답 오류" time="어제" />
+            <LogItem type="success" message="운영 서버 실시간 데이터 연동 완료" time="방금 전" />
+            <LogItem type="info" message="라우터 주소 체계 개편 반영 (v1.3.0)" time="1시간 전" />
+            <LogItem type="success" message="KIVO 인증 모듈 업데이트" time="어제" />
           </div>
         </div>
         

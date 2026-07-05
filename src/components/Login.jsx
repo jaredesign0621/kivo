@@ -1,30 +1,47 @@
 import React, { useState } from 'react';
 import loginLogoUrl from '../assets/img/login_logo.png';
 import SignupModal from './SignupModal';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export default function Login({ onLogin }) {
-  const [id, setId] = useState('tester1');
-  const [password, setPassword] = useState('0621');
+  const [id, setId] = useState(import.meta.env.DEV ? 'tester1' : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? '0621' : '');
   const [error, setError] = useState('');
   const [isSignupOpen, setIsSignupOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     
-    // 관리자 계정 확인
+    // 최고 관리자 계정 하드코딩 패스
     if (id === 'admin' && password === 'admin') {
-      setError('');
       onLogin('admin');
-    } 
-    // 일반 테스트 계정 확인
-    else if (id === 'tester1' && password === '0621') {
-      setError('');
-      onLogin('user');
-    } 
-    // 실패
-    else {
+      return;
+    }
+
+    // 로컬 개발 환경에서만 허용되는 강제 로그인(하드코딩)
+    if (import.meta.env.DEV) {
+      if (id === 'tester1' && password === '0621') {
+        onLogin('user');
+        return;
+      }
+    }
+
+    // 실제 Firebase Auth 로그인 처리
+    setIsLoading(true);
+    try {
+      // SignupModal에서 아이디에 '@kivo.com'을 붙여 가입시키므로 동일하게 변환하여 로그인
+      const virtualEmail = id.includes('@') ? id : `${id}@kivo.com`;
+      await signInWithEmailAndPassword(auth, virtualEmail, password);
+      onLogin('user'); // 실제 유저는 기본 'user' 롤
+    } catch (err) {
+      console.error('Login error:', err);
       setError('아이디 또는 비밀번호가 올바르지 않습니다.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,7 +74,7 @@ export default function Login({ onLogin }) {
               type="text" 
               value={id}
               onChange={(e) => setId(e.target.value)}
-              placeholder="tester1"
+              placeholder="아이디"
               className="w-full h-10 px-3 rounded-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-body placeholder:text-gray-400"
               required
             />
@@ -71,7 +88,7 @@ export default function Login({ onLogin }) {
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="비밀번호"
               className="w-full h-10 px-3 rounded-sm border border-gray-300 bg-gray-50 focus:bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-body placeholder:text-gray-400"
               required
             />
@@ -93,19 +110,22 @@ export default function Login({ onLogin }) {
           {/* 4. 로그인 버튼 */}
           <button 
             type="submit"
-            className="w-full h-10 mt-2 bg-primary hover:bg-blue-700 text-white font-semibold rounded-sm transition-colors shadow-sm"
+            disabled={isLoading}
+            className="w-full h-10 mt-2 bg-primary hover:bg-blue-700 text-white font-semibold rounded-sm transition-colors shadow-sm disabled:opacity-50"
           >
-            로그인
+            {isLoading ? '로그인 중...' : '로그인'}
           </button>
 
-          {/* 테스트용 관리자 로그인 버튼 */}
-          <button 
-            type="button"
-            onClick={() => onLogin('admin')}
-            className="w-full h-10 mt-2 border border-gray-300 hover:bg-gray-50 text-neutral-main font-semibold rounded-sm transition-colors shadow-sm"
-          >
-            (테스트용) 관리자로 바로 진입
-          </button>
+          {/* 테스트용 관리자 로그인 버튼 (로컬 환경에서만 노출) */}
+          {import.meta.env.DEV && (
+            <button 
+              type="button"
+              onClick={() => onLogin('admin')}
+              className="w-full h-10 mt-2 border border-gray-300 hover:bg-gray-50 text-neutral-main font-semibold rounded-sm transition-colors shadow-sm"
+            >
+              (테스트용) 관리자로 바로 진입
+            </button>
+          )}
         </form>
 
         {/* 5, 6. 보조 링크 영역 */}
