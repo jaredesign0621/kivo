@@ -3,6 +3,7 @@ import { FiGrid, FiSettings, FiChevronDown, FiSidebar, FiMenu, FiUser, FiLogOut 
 import logoUrl from '../assets/img/logo.png';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import ConfirmModal from './ConfirmModal';
 
 export default function GlobalHeader({ onToggleLnb, hasProject = true, onOpenCreateProject }) {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
@@ -10,6 +11,7 @@ export default function GlobalHeader({ onToggleLnb, hasProject = true, onOpenCre
   
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef(null);
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '' });
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -136,7 +138,11 @@ export default function GlobalHeader({ onToggleLnb, hasProject = true, onOpenCre
                 onClick={() => {
                   setIsProfileMenuOpen(false);
                   // TODO: 프로필 편집 모달 오픈 연결
-                  alert('프로필 편집 모달을 엽니다.');
+                  setAlertConfig({
+                    isOpen: true,
+                    title: '프로필 편집',
+                    message: '프로필 편집 기능은 준비 중입니다.'
+                  });
                 }}
               >
                 <FiUser size={16} /> 프로필 편집
@@ -152,6 +158,15 @@ export default function GlobalHeader({ onToggleLnb, hasProject = true, onOpenCre
           )}
         </div>
       </div>
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </header>
   );
 }

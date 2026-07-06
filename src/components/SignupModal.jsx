@@ -4,6 +4,7 @@ import { auth, db, storage } from '../firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import ConfirmModal from './ConfirmModal';
 
 export default function SignupModal({ isOpen, onClose }) {
   const [formData, setFormData] = useState({
@@ -23,6 +24,11 @@ export default function SignupModal({ isOpen, onClose }) {
 
   const [idChecked, setIdChecked] = useState(false);
   const [profilePreview, setProfilePreview] = useState(null);
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
+
+  const showAlert = (title, message, onConfirm = null) => {
+    setAlertConfig({ isOpen: true, title, message, onConfirm });
+  };
   const [profileFile, setProfileFile] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
@@ -64,7 +70,7 @@ export default function SignupModal({ isOpen, onClose }) {
 
   const checkIdDuplicate = async () => {
     if (!formData.id.trim()) {
-      alert('아이디를 입력해주세요.');
+      showAlert('알림', '아이디를 입력해주세요.');
       return;
     }
     
@@ -72,30 +78,30 @@ export default function SignupModal({ isOpen, onClose }) {
       const docRef = doc(db, 'users', formData.id);
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
-        alert('이미 사용중인 아이디입니다.');
+        showAlert('알림', '이미 사용중인 아이디입니다.');
         setIdChecked(false);
       } else {
-        alert('사용 가능한 아이디입니다.');
+        showAlert('알림', '사용 가능한 아이디입니다.');
         setIdChecked(true);
       }
     } catch (error) {
       console.error('Error checking duplicate ID:', error);
-      alert('중복 확인 중 오류가 발생했습니다.');
+      showAlert('오류', '중복 확인 중 오류가 발생했습니다.');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!idChecked) {
-      alert('아이디 중복확인을 진행해주세요.');
+      showAlert('알림', '아이디 중복확인을 진행해주세요.');
       return;
     }
     if (formData.password !== formData.passwordConfirm) {
-      alert('비밀번호가 일치하지 않습니다.');
+      showAlert('알림', '비밀번호가 일치하지 않습니다.');
       return;
     }
     if (!agreements.terms || !agreements.privacy) {
-      alert('필수 약관에 동의해주세요.');
+      showAlert('알림', '필수 약관에 동의해주세요.');
       return;
     }
     
@@ -129,14 +135,13 @@ export default function SignupModal({ isOpen, onClose }) {
         status: '활성'
       });
 
-      alert('회원가입이 완료되었습니다!');
-      onClose();
+      showAlert('알림', '회원가입이 완료되었습니다!', onClose);
     } catch (error) {
       console.error('Error during signup:', error);
       if (error.code === 'auth/email-already-in-use') {
-         alert('이미 가입된 아이디입니다.');
+         showAlert('알림', '이미 가입된 아이디입니다.');
       } else {
-         alert('회원가입 중 오류가 발생했습니다: ' + error.message);
+         showAlert('오류', '회원가입 중 오류가 발생했습니다: ' + error.message);
       }
     } finally {
       setIsLoading(false);
@@ -390,6 +395,18 @@ export default function SignupModal({ isOpen, onClose }) {
         </div>
 
       </div>
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => {
+          setAlertConfig(prev => ({ ...prev, isOpen: false }));
+          if (alertConfig.onConfirm) alertConfig.onConfirm();
+        }}
+      />
     </div>
   );
 }

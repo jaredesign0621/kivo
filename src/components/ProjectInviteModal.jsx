@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FiX, FiCheck } from 'react-icons/fi';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import ConfirmModal from './ConfirmModal';
 
 export default function ProjectInviteModal({ isOpen, onClose }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '' });
 
   // 사용자 초대 관련 상태
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,8 +119,11 @@ export default function ProjectInviteModal({ isOpen, onClose }) {
       await new Promise(resolve => setTimeout(resolve, 800));
       
       setIsLoading(false);
-      alert(`${selectedUsers.length}명의 사용자를 성공적으로 초대했습니다!`);
-      onClose();
+      setAlertConfig({
+        isOpen: true,
+        title: '초대 완료',
+        message: `${selectedUsers.length}명의 사용자를 성공적으로 초대했습니다!`
+      });
     } catch (err) {
       console.error("Invite Error:", err);
       setError('사용자 초대 중 오류가 발생했습니다.');
@@ -245,6 +250,18 @@ export default function ProjectInviteModal({ isOpen, onClose }) {
           </div>
         </form>
       </div>
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => {
+          setAlertConfig(prev => ({ ...prev, isOpen: false }));
+          onClose();
+        }}
+      />
     </div>
   );
 }

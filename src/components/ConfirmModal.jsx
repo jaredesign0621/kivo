@@ -10,7 +10,8 @@ export default function ConfirmModal({
   confirmText = '확인', 
   cancelText = '취소', 
   isDestructive = false,
-  isLoading = false
+  isLoading = false,
+  showCancel = true
 }) {
   if (!isOpen) return null;
 
@@ -19,7 +20,7 @@ export default function ConfirmModal({
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
-        onClick={!isLoading ? onCancel : undefined} 
+        onClick={!isLoading && showCancel ? onCancel : undefined} 
       />
       
       {/* Modal Content */}
@@ -37,14 +38,16 @@ export default function ConfirmModal({
         </div>
 
         <div className="bg-gray-50/80 px-6 py-4 flex justify-end gap-2 border-t border-gray-100">
-          <button 
-            type="button" 
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-4 py-2 text-neutral-meta hover:bg-gray-200 rounded-sm font-medium transition-colors text-[14px] disabled:opacity-50"
-          >
-            {cancelText}
-          </button>
+          {showCancel && (
+            <button 
+              type="button" 
+              onClick={onCancel}
+              disabled={isLoading}
+              className="px-4 py-2 text-neutral-meta hover:bg-gray-200 rounded-sm font-medium transition-colors text-[14px] disabled:opacity-50"
+            >
+              {cancelText}
+            </button>
+          )}
           <button 
             type="button" 
             onClick={onConfirm}

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Routes, Route, Navigate } from 'react-router-dom';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import {
@@ -17,9 +17,13 @@ import {
   FiBox,
   FiDownload,
   FiMoreVertical,
-  FiFilter
+  FiFilter,
+  FiEdit2,
+  FiTrash2
 } from 'react-icons/fi';
 import logoUrl from '../assets/img/logo.png';
+import ConfirmModal from './ConfirmModal';
+import UserEditModal from './UserEditModal';
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -485,13 +489,23 @@ function ProjectsManagementContent() {
 function UsersManagementContent() {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [openMenuUserId, setOpenMenuUserId] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '' });
+  
+  const userMenuRef = useRef(null);
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const usersData = [];
       querySnapshot.forEach((doc) => {
-        usersData.push(doc.data());
+        usersData.push({ id: doc.id, ...doc.data() });
       });
       setUsers(usersData);
       setIsLoading(false);
@@ -502,6 +516,69 @@ function UsersManagementContent() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setOpenMenuUserId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    setIsDeleting(true);
+    try {
+      if (selectedUser.id && !selectedUser.id.endsWith('_dummy')) {
+        await deleteDoc(doc(db, 'users', selectedUser.id));
+      } else {
+        // 더미 유저일 경우 프론트에서만 상태 필터링
+        setUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+      }
+      setIsDeleteModalOpen(false);
+      setAlertConfig({
+        isOpen: true,
+        title: '삭제 완료',
+        message: '사용자 정보가 성공적으로 삭제되었습니다.'
+      });
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({
+        isOpen: true,
+        title: '오류',
+        message: '사용자 삭제 중 오류가 발생했습니다.'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleEditUser = async (formData) => {
+    if (!selectedUser) return;
+    try {
+      if (selectedUser.id && !selectedUser.id.endsWith('_dummy')) {
+        await updateDoc(doc(db, 'users', selectedUser.id), formData);
+      } else {
+        // 더미 유저일 경우 프론트 상태만 수정
+        setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u));
+      }
+      setIsEditModalOpen(false);
+      setAlertConfig({
+        isOpen: true,
+        title: '수정 완료',
+        message: '사용자 정보가 성공적으로 수정되었습니다.'
+      });
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({
+        isOpen: true,
+        title: '오류',
+        message: '사용자 정보 수정 중 오류가 발생했습니다.'
+      });
+    }
+  };
 
   // 로컬 개발 환경일 때 UI 수정을 위해 더미 데이터를 추가로 보여줍니다.
   const dummyUsers = [
@@ -607,10 +684,45 @@ function UsersManagementContent() {
                       {user.status || '활성'}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-center">
-                    <button className="p-1.5 text-gray-400 hover:text-neutral-main hover:bg-gray-200 rounded-sm transition-colors opacity-0 group-hover:opacity-100">
+                  <td className="px-5 py-3 text-center relative overflow-visible">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuUserId(openMenuUserId === user.id ? null : user.id);
+                        setSelectedUser(user);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-neutral-main hover:bg-gray-200 rounded-sm transition-colors opacity-0 group-hover:opacity-100"
+                    >
                       <FiMoreVertical size={16} />
                     </button>
+                    
+                    {openMenuUserId === user.id && (
+                      <div 
+                        ref={userMenuRef} 
+                        className="absolute right-12 top-2 bg-white border border-gray-200 shadow-floating rounded-sm py-1 w-24 z-50 animate-fade-in text-left"
+                      >
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsEditModalOpen(true);
+                            setOpenMenuUserId(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-[12px] text-neutral-main hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                        >
+                          <FiEdit2 size={12} /> 수정
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsDeleteModalOpen(true);
+                            setOpenMenuUserId(null);
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-[12px] text-red-500 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                        >
+                          <FiTrash2 size={12} /> 삭제
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))
@@ -627,6 +739,37 @@ function UsersManagementContent() {
           <button className="px-2 py-1 border border-gray-200 rounded-sm bg-white hover:bg-gray-50 disabled:opacity-50" disabled>다음</button>
         </div>
       </div>
+
+      {/* User Edit Modal */}
+      <UserEditModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        user={selectedUser}
+        onSave={handleEditUser}
+      />
+
+      {/* User Delete Confirmation Modal */}
+      <ConfirmModal 
+        isOpen={isDeleteModalOpen}
+        title="사용자 삭제"
+        message={`정말 ${selectedUser?.name || '이'} 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+        confirmText="삭제하기"
+        cancelText="취소"
+        isDestructive={true}
+        isLoading={isDeleting}
+        onConfirm={handleDeleteUser}
+        onCancel={() => setIsDeleteModalOpen(false)}
+      />
+
+      {/* Alert Modal */}
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
       
     </div>
   );

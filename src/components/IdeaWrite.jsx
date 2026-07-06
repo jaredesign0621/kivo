@@ -15,8 +15,9 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import SlashCommandPopover from './SlashCommandPopover';
+import ConfirmModal from './ConfirmModal';
 
-const EditorToolbar = ({ editor }) => {
+const EditorToolbar = ({ editor, showAlert, closeAlert }) => {
   const fileInputRef = useRef(null);
 
   if (!editor) return null;
@@ -26,8 +27,8 @@ const EditorToolbar = ({ editor }) => {
     if (!file) return;
 
     try {
-      // 로딩 상태 표시(임시)
-      const toastId = alert('이미지를 업로드 중입니다...');
+      // 로딩 상태 표시
+      showAlert('업로드 중', '이미지를 업로드 중입니다...', null, true);
       
       const fileExt = file.name.split('.').pop();
       const fileName = `ideas/images/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
@@ -36,6 +37,7 @@ const EditorToolbar = ({ editor }) => {
       const snapshot = await uploadBytes(storageRef, file);
       const downloadURL = await getDownloadURL(snapshot.ref);
       
+      closeAlert();
       editor.chain().focus().setImage({ src: downloadURL }).run();
       
       // 파일 입력 초기화
@@ -44,7 +46,7 @@ const EditorToolbar = ({ editor }) => {
       }
     } catch (error) {
       console.error('Image upload failed:', error);
-      alert('이미지 업로드에 실패했습니다.');
+      showAlert('오류', '이미지 업로드에 실패했습니다.');
     }
   };
 
@@ -152,6 +154,16 @@ export default function IdeaWrite({ boardId, boardTitle, initialIdea = null, onS
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [popoverCoords, setPopoverCoords] = useState(null);
 
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '', isLoading: false });
+  
+  const showAlert = (title, message, onConfirm = null, isLoading = false) => {
+    setAlertConfig({ isOpen: true, title, message, isLoading });
+  };
+  
+  const closeAlert = () => {
+    setAlertConfig(prev => ({ ...prev, isOpen: false }));
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -237,13 +249,13 @@ export default function IdeaWrite({ boardId, boardTitle, initialIdea = null, onS
           editor.chain().focus().setImage({ src: downloadURL }).run();
         } catch (error) {
           console.error('Upload failed:', error);
-          alert('이미지 업로드에 실패했습니다.');
+          showAlert('오류', '이미지 upload에 실패했습니다.');
         }
       };
       input.click();
     } else if (cmd.id === 'jira') {
       // Placeholder for Jira integration
-      alert('Jira 이슈 연결 팝업 (준비 중)');
+      showAlert('Jira 연동', 'Jira 이슈 연결 팝업 (준비 중)');
     }
     
     setIsPopoverOpen(false);
@@ -331,7 +343,7 @@ export default function IdeaWrite({ boardId, boardTitle, initialIdea = null, onS
             </div>
             
             <div className="flex-1 relative cursor-text group tiptap-wrapper flex flex-col" onClick={() => editor?.commands.focus()}>
-              <EditorToolbar editor={editor} />
+              <EditorToolbar editor={editor} showAlert={showAlert} closeAlert={closeAlert} />
               
               <style>{`
                 .ProseMirror p.is-editor-empty:first-child::before {
@@ -428,6 +440,16 @@ export default function IdeaWrite({ boardId, boardTitle, initialIdea = null, onS
         coords={popoverCoords}
         onSelect={handleCommandSelect}
         onClose={() => setIsPopoverOpen(false)}
+      />
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        isLoading={alertConfig.isLoading}
+        onConfirm={closeAlert}
       />
     </div>
   );

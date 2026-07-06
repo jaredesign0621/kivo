@@ -9,6 +9,7 @@ export default function IdeaBoard({ boardId, boardTitle, onWriteClick, onIdeaCli
   const [isLoading, setIsLoading] = useState(true);
   const [deleteIdeaId, setDeleteIdeaId] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '' });
 
   useEffect(() => {
     if (!boardId) return;
@@ -66,7 +67,11 @@ export default function IdeaBoard({ boardId, boardTitle, onWriteClick, onIdeaCli
       setDeleteIdeaId(null);
     } catch (error) {
       console.error("Error deleting document: ", error);
-      alert('삭제 중 오류가 발생했습니다.');
+      setAlertConfig({
+        isOpen: true,
+        title: '오류',
+        message: '삭제 중 오류가 발생했습니다.'
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -165,6 +170,15 @@ export default function IdeaBoard({ boardId, boardTitle, onWriteClick, onIdeaCli
         isLoading={isDeleting}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteIdeaId(null)}
+      />
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

@@ -29,8 +29,9 @@ export default function ConfluencePanel({ isLnbOpen = true, onOpenInviteModal })
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
 
-  const [deleteIdeaId, setDeleteIdeaId] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteBoardId, setDeleteBoardId] = useState(null);
+  const [isDeletingBoard, setIsDeletingBoard] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '' });
 
   const menuRef = useRef(null);
 
@@ -82,32 +83,35 @@ export default function ConfluencePanel({ isLnbOpen = true, onOpenInviteModal })
     setActiveMenuId(null);
   };
 
-  const handleDeleteBoard = async (e, id) => {
+  const handleDeleteBoard = (e, id) => {
     e.stopPropagation();
-    if (window.confirm('정말 이 게시판을 삭제하시겠습니까? 내부의 모든 게시물도 삭제됩니다.')) {
-      try {
-        await deleteDoc(doc(db, 'ideaDocs', id));
-        if (activeBoardId === id) {
-          setActiveBoardId(ideaDocs[0]?.id || null);
-        }
-      } catch (error) {
-        console.error("Error deleting document: ", error);
-        alert('삭제 중 오류가 발생했습니다.');
-      }
-    }
+    setDeleteBoardId(id);
+    setActiveMenuId(null);
   };
 
-  const confirmDeleteIdea = async () => {
-    if (!deleteIdeaId) return;
-    setIsDeleting(true);
+  const executeDeleteBoard = async () => {
+    if (!deleteBoardId) return;
+    setIsDeletingBoard(true);
     try {
-      await deleteDoc(doc(db, 'ideas', deleteIdeaId));
-      setActiveView('list');
-      setDeleteIdeaId(null);
+      await deleteDoc(doc(db, 'ideaDocs', deleteBoardId));
+      if (boardIdParam === deleteBoardId) {
+        const remainingDocs = ideaDocs.filter(d => d.id !== deleteBoardId);
+        if (remainingDocs.length > 0) {
+          navigate(`/workspace/ideas/${remainingDocs[0].id}`);
+        } else {
+          navigate('/workspace/ideas');
+        }
+      }
+      setDeleteBoardId(null);
     } catch (error) {
-      alert('삭제 중 오류가 발생했습니다.');
+      console.error("Error deleting document: ", error);
+      setAlertConfig({
+        isOpen: true,
+        title: '오류',
+        message: '삭제 중 오류가 발생했습니다.'
+      });
     } finally {
-      setIsDeleting(false);
+      setIsDeletingBoard(false);
     }
   };
 
@@ -129,12 +133,16 @@ export default function ConfluencePanel({ isLnbOpen = true, onOpenInviteModal })
           title: title,
           createdAt: serverTimestamp()
         });
-        setActiveBoardId(newDocRef.id);
+        navigate(`/workspace/ideas/${newDocRef.id}`);
         if (!isIdeaExpanded) setIsIdeaExpanded(true);
       }
     } catch (error) {
       console.error("Error saving document: ", error);
-      alert('저장 중 오류가 발생했습니다.');
+      setAlertConfig({
+        isOpen: true,
+        title: '오류',
+        message: '저장 중 오류가 발생했습니다.'
+      });
     }
     
     setIsManageModalOpen(false);
@@ -296,20 +304,26 @@ export default function ConfluencePanel({ isLnbOpen = true, onOpenInviteModal })
         initialData={editingDoc}
       />
 
-      {isDeleting && (
-        <ConfirmModal 
-          title="문서 삭제"
-          message="이 문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-          confirmText="삭제하기"
-          cancelText="취소"
-          onConfirm={executeDelete}
-          onCancel={() => {
-            setIsDeleting(false);
-            setDeleteIdeaId(null);
-          }}
-          isDestructive={true}
-        />
-      )}
+      <ConfirmModal 
+        isOpen={!!deleteBoardId}
+        title="게시판 삭제"
+        message="정말 이 게시판을 삭제하시겠습니까? 내부의 모든 게시물도 삭제됩니다."
+        confirmText="삭제하기"
+        cancelText="취소"
+        isDestructive={true}
+        isLoading={isDeletingBoard}
+        onConfirm={executeDeleteBoard}
+        onCancel={() => setDeleteBoardId(null)}
+      />
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
     </>
   );
 }
@@ -349,15 +363,23 @@ function IdeaDetailWrapper() {
   const location = useLocation();
   const navigate = useNavigate();
   const [idea, setIdea] = useState(location.state?.idea || null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ isOpen: false, title: '', message: '' });
   
   useEffect(() => {
     if (!idea) {
       const fetchIdea = async () => {
-        const docRef = doc(db, 'ideaDocs', boardId, 'ideas', ideaId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setIdea({ id: docSnap.id, ...docSnap.data() });
-        } else {
+        try {
+          const docRef = doc(db, 'ideas', ideaId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            setIdea({ id: docSnap.id, ...docSnap.data() });
+          } else {
+            navigate(`/workspace/ideas/${boardId}`);
+          }
+        } catch (err) {
+          console.error("Error fetching idea:", err);
           navigate(`/workspace/ideas/${boardId}`);
         }
       };
@@ -365,14 +387,55 @@ function IdeaDetailWrapper() {
     }
   }, [boardId, ideaId, idea, navigate]);
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'ideas', ideaId));
+      setIsDeleteOpen(false);
+      navigate(`/workspace/ideas/${boardId}`);
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({
+        isOpen: true,
+        title: '오류',
+        message: '삭제 중 오류가 발생했습니다.'
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!idea) return <div className="p-8 text-neutral-meta flex-1 bg-bg-base">게시글을 불러오는 중입니다...</div>;
 
   return (
-    <IdeaDetail 
-      idea={idea} 
-      onBack={() => navigate(`/workspace/ideas/${boardId}`)}
-      onEdit={() => navigate(`/workspace/ideas/${boardId}/write`, { state: { initialIdea: idea } })}
-      onDelete={() => navigate(`/workspace/ideas/${boardId}`)}
-    />
+    <>
+      <IdeaDetail 
+        idea={idea} 
+        onBack={() => navigate(`/workspace/ideas/${boardId}`)}
+        onEdit={() => navigate(`/workspace/ideas/${boardId}/write`, { state: { initialIdea: idea } })}
+        onDelete={() => setIsDeleteOpen(true)}
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        title="문서 삭제"
+        message="이 문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        confirmText="삭제하기"
+        cancelText="취소"
+        isDestructive={true}
+        isLoading={isDeleting}
+        onConfirm={handleDelete}
+        onCancel={() => setIsDeleteOpen(false)}
+      />
+
+      <ConfirmModal 
+        isOpen={alertConfig.isOpen}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        confirmText="확인"
+        showCancel={false}
+        onConfirm={() => setAlertConfig(prev => ({ ...prev, isOpen: false }))}
+      />
+    </>
   );
 }
